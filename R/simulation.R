@@ -22,6 +22,7 @@ sim_all <- function() {
   setDT(configs)
 
   set.seed(1)
+  mc.cores <- 1 # change this if you want to run in parallel
   cbs_sim <- rbindlist(mclapply(1:nrow(configs), function(i) {
     cat(i, 'of', nrow(configs), '\n')
     config <- as.list(configs[i,])
@@ -51,7 +52,7 @@ sim_all <- function() {
     cbs <- cbind(cbs, data.frame(est.cnbd))
     cbs <- cbind(cbs, data.frame(est.nbd))
     return(cbs)
-  }, mc.cores = detectCores()))
+  }, mc.cores = mc.cores))
   write_csv(cbs_sim, 'results/sim-cbs.csv.gz')
   cbs_sim
 }
