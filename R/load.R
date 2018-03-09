@@ -1,6 +1,8 @@
 
 #' Load Required R Packages
 
+library(readr)
+library(parallel)
 library(data.table)
 library(BTYD)
 library(ggplot2)

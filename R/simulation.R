@@ -1,7 +1,10 @@
 source('R/load.r')
 
+# Run large-scale simulation study.
+# Simulated customers will be stored in `results/sim-cbs.csv.gz`
 sim_all <- function() {
-  # Simulate Data for various scenarios
+
+  # define parameter scenarios to be simulated
   T.cal   <- 52
   T.stars <- c(4, 16, 52)
   repeats <- 5 # how many time each scenario should be generated
@@ -19,7 +22,7 @@ sim_all <- function() {
   setDT(configs)
 
   set.seed(1)
-  cbs.sim <- rbindlist(lapply(1:nrow(configs), function(i) {
+  cbs_sim <- rbindlist(mclapply(1:nrow(configs), function(i) {
     cat(i, 'of', nrow(configs), '\n')
     config <- as.list(configs[i,])
     params <- c(k=config$k, r=config$r, alpha=config$alpha, a=config$a, b=config$b)
@@ -48,13 +51,16 @@ sim_all <- function() {
     cbs <- cbind(cbs, data.frame(est.cnbd))
     cbs <- cbind(cbs, data.frame(est.nbd))
     return(cbs)
-  }))
-  save(cbs.sim, file='results/sim-cbs.rdata')
-  cbs.sim
+  }, mc.cores = detectCores()))
+  write_csv(cbs_sim, 'results/sim-cbs.csv.gz')
+  cbs_sim
 }
 
+# Calculate summary stats for all simulations.
+# Statistics will be stored in `results/sim-stats.csv`
 get_stats <- function(cbs) {
-  get_single <- function(cbs, T.star) {
+  # calculate summary stats for a specific T.star holdout period
+  get_stats_for_tstar <- function(cbs, T.star) {
     bias <- function(act, est) (sum(est)-sum(act))/sum(act)
     mae  <- function(act, est) mean(abs(act-est))
     rmse <- function(act, est) sqrt(mean((act-est)^2))
@@ -75,30 +81,31 @@ get_stats <- function(cbs) {
     stats[, k := as.ordered(k)]
     stats
   }
-  stats <- rbind(get_single(cbs, 52), get_single(cbs, 16), get_single(cbs, 4))
-  fwrite(stats, file='results/sim-stats.csv')
+  stats <- rbind(get_stats_for_tstar(cbs, 52),
+                 get_stats_for_tstar(cbs, 16),
+                 get_stats_for_tstar(cbs, 4))
+  write_csv(stats, 'results/sim-stats.csv')
   stats
 }
 
-gen <- function() {
-  cbs.sim <- sim_all()
-  stats <- get_stats(cbs.sim)
-  return(stats)
-}
+# cbs_sim <- sim_all()
+# stats <- get_stats(cbs_sim)
+
 
 report_basic_stats <- function() {
-  stats <- fread('results/sim-stats.csv')
+  stats <- read_csv('results/sim-stats.csv')
   stats_paper <- stats[T.star==52 & dropout_at_zero==F]
   round(summary(stats_paper[, (1-x0)*x_]), 2) # number of transactions during calibration
   # Min. 1st Qu.  Median    Mean 3rd Qu.    Max.
-  # 0.47    1.13    1.77    2.02    2.65    6.21
+  # 0.47    1.12    1.76    2.02    2.66    6.27
   round(summary(stats_paper[, x0]), 2)
   # Min. 1st Qu.  Median    Mean 3rd Qu.    Max.
-  # 0.15    0.31    0.43    0.45    0.59    0.76
+  # 0.15    0.31    0.44    0.45    0.59    0.76
 }
 
+
 plot_some <- function() {
-  stats <- fread('results/sim-stats.csv')
+  stats <- read_csv('results/sim-stats.csv')
 
   ss <- stats[T.star==52 & dropout_at_zero==F]
   st <- melt(ss[, .(k, bias_nbd, bias_cnbd, mae_nbd, mae_cnbd)], id.vars='k')
@@ -176,6 +183,9 @@ plot_some <- function() {
   save_plot("figures/sim-lift-vs-palive.png", p, base_aspect_ratio = 1.5)
 }
 
+
+# Basic speed comparison between BG/CNBD-k and Pareto/GGG
+# (running on single core)
 clock <- function() {
   set.seed(1)
   cbs <- bgcnbd.GenerateData(4000, 52, 52, c(k=2, r=0.25, alpha=2.5, a=0.25, b=2.5))$cbs
@@ -191,6 +201,7 @@ clock <- function() {
   })
   # 650secs
 }
+
 
 tracking_plot <- function() {
   set.seed(4)
