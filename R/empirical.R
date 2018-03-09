@@ -260,7 +260,7 @@ gen_stats_grocery <- function() {
     background_grid(major = "y", minor = "none") +
     theme(axis.text.x = element_text(angle=0, vjust=0.5, size=12), axis.title = element_blank(), axis.line.x=element_blank()) +
     geom_abline(slope=0, intercept = 0))
-  save_plot("results/emp-category-lift.png", p, base_aspect_ratio = 1.2)
+  save_plot("figures/emp-category-lift.png", p, base_aspect_ratio = 1.2)
 }
 
 plotTracDonations <- function() {
